@@ -23,7 +23,7 @@ Aplicación web local con cuatro módulos:
 1. Descarga el proyecto y abre **`Instalar Vigia.bat`** (doble clic).
 2. El instalador revisa si tienes **Node.js 20.19+** y **PostgreSQL 14+**. Si falta alguno, te pregunta y lo instala desde su fuente oficial con winget (Windows pedirá permiso de administrador). PostgreSQL se instala solo con el motor, sin pgAdmin ni Stack Builder. No instala nada más.
 3. Prepara Vigía: librerías del proyecto y una base de datos propia en `%LOCALAPPDATA%\Vigia` (puerto libre desde 5433, solo accesible desde tu PC), que no toca otras bases de datos ni necesita la contraseña de tu PostgreSQL.
-4. Al final muestra los usuarios y contraseñas (quedan en `backend/.env`) y, si quieres, crea los accesos directos **Iniciar Vigia** y **Detener Vigia** en el escritorio.
+4. Al final muestra los usuarios y contraseñas de **tu** computadora (cada instalación genera las suyas) y, si quieres, crea los accesos directos **Iniciar Vigia**, **Detener Vigia** y **Ver contrasenas** en el escritorio. Con **Ver contrasenas** puedes volver a consultarlas cuando quieras.
 5. Abre **Iniciar Vigia**, entra como `admin` y en *Listas Internacionales* presiona **Sincronizar todas** (unos 10 minutos la primera vez).
 
 Para desinstalar: borra la carpeta del proyecto y `%LOCALAPPDATA%\Vigia`. Node.js y PostgreSQL se quitan desde *Configuración → Aplicaciones*.

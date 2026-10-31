@@ -3,9 +3,12 @@ rem Prende el proyecto Vigia (API + pagina web) y abre el navegador.
 title Vigia - iniciando
 cd /d "%~dp0"
 set URL=http://127.0.0.1:5173
+rem La salud se consulta directo a la API (puerto 4000) y no a traves de la pagina web:
+rem asi el proxy de Vite no muestra errores mientras la API termina de arrancar.
+set API=http://127.0.0.1:4000/api/health
 
 rem 1. Si ya esta prendido, solo abre el navegador.
-curl -s %URL%/api/health 2>nul | find "ok" >nul && (
+curl -s %API% 2>nul | find "ok" >nul && (
   echo Vigia ya estaba prendido. Abriendo el navegador...
   start "" %URL%
   timeout /t 2 >nul
@@ -63,9 +66,9 @@ rem 4. Prende el servidor en su propia ventana.
 echo Prendiendo Vigia...
 start "Vigia - servidor (no cerrar)" cmd /k "title Vigia - servidor (no cerrar) && set VIGIA_SERVIDOR=1 && npm run dev"
 
-rem 5. Espera hasta que responda (maximo 60 segundos).
+rem 5. Espera hasta que respondan la API y la pagina web (maximo 60 segundos).
 for /l %%i in (1,1,60) do (
-  curl -s %URL%/api/health 2>nul | find "ok" >nul && goto listo
+  curl -s %API% 2>nul | find "ok" >nul && curl -s -o nul %URL% 2>nul && goto listo
   timeout /t 1 >nul
 )
 echo.

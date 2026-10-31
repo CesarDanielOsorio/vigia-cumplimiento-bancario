@@ -266,10 +266,10 @@ Ok 'Tablas y datos de ejemplo listos'
 Titulo 'Paso 6 de 6 · Accesos directos'
 if ($SinAccesos) {
   Info 'Omitido.'
-} elseif (Confirmar '¿Crear «Iniciar Vigia» y «Detener Vigia» en el escritorio?') {
+} elseif (Confirmar '¿Crear «Iniciar Vigia», «Detener Vigia» y «Ver contrasenas» en el escritorio?') {
   $shell = New-Object -ComObject WScript.Shell
   $escritorio = [Environment]::GetFolderPath('Desktop')
-  foreach ($n in @('Iniciar Vigia', 'Detener Vigia')) {
+  foreach ($n in @('Iniciar Vigia', 'Detener Vigia', 'Ver contrasenas')) {
     $lnk = $shell.CreateShortcut((Join-Path $escritorio "$n.lnk"))
     $lnk.TargetPath = Join-Path $root "$n.bat"
     $lnk.WorkingDirectory = $root
@@ -286,7 +286,7 @@ Get-Content $envFile | ForEach-Object { if ($_ -match '^(SEED_\w+_PASSWORD)=(.*)
 Write-Host ''
 Write-Host '  ¡Vigía quedó instalado!' -ForegroundColor Green
 Write-Host ''
-Write-Host '  Usuarios (las contraseñas también están en backend\.env; no las compartas):'
+Write-Host '  Usuarios y contraseñas de ESTA computadora (puedes volver a verlas con «Ver contrasenas»):'
 Write-Host "    admin     $($claves['SEED_ADMIN_PASSWORD'])   Administrador del sistema"
 Write-Host "    lider     $($claves['SEED_LIDER_PASSWORD'])   Líder de proyecto"
 Write-Host "    analista  $($claves['SEED_ANALYST_PASSWORD'])   Analista de riesgo"

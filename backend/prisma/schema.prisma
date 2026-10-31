@@ -1,0 +1,243 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Seguridad: usuarios y bitácora ───────────────────────────────────────────
+
+// Roles del equipo del proyecto (enunciado y matriz RACI) más el administrador del sistema.
+// Qué puede hacer cada uno está en src/config/permissions.ts.
+enum Role {
+  ADMIN // administrador del sistema: ve todo, configura y ejecuta tareas operativas; no aprueba
+  LIDER // líder de proyecto: gobierno del trabajo
+  ANALISTA_RIESGO // taxonomía, factores y escenarios
+  ANALISTA_DATOS // modelo, ponderaciones y sensibilidad
+  DESARROLLADOR_BI // matriz y visualización
+  AUDITOR // Auditor/QA: evidencia, pruebas y control de cambios
+}
+
+model User {
+  id             Int        @id @default(autoincrement())
+  username       String     @unique
+  fullName       String
+  passwordHash   String // bcrypt, nunca la contraseña en claro
+  role           Role       @default(ANALISTA_RIESGO)
+  active         Boolean    @default(true)
+  failedAttempts Int        @default(0)
+  lockedUntil    DateTime? // bloqueo temporal tras intentos fallidos
+  lastLoginAt    DateTime?
+  createdAt      DateTime   @default(now())
+  auditLogs      AuditLog[]
+
+  versionsCreated      WeightVersion[]    @relation("VersionAuthor")
+  versionsReviewed     WeightVersion[]    @relation("VersionReviewer")
+  riskEvents           RiskEvent[]
+  incidentsDetected    DataIncident[]     @relation("IncidentDetector")
+  incidentsDiagnosed   DataIncident[]     @relation("IncidentDiagnoser")
+  incidentsCorrected   DataIncident[]     @relation("IncidentCorrector")
+  incidentsRevalidated DataIncident[]     @relation("IncidentRevalidator")
+  incidentsApproved    DataIncident[]     @relation("IncidentApprover")
+  incidentsInformed    DataIncident[]     @relation("IncidentSponsorInformer")
+  incidentActivities   IncidentActivity[]
+  configChanges        SystemConfig[]
+}
+
+// Parámetros del sistema que el administrador ajusta desde Configuración (una sola fila, id = 1).
+model SystemConfig {
+  id                Int      @id @default(1)
+  sessionMinutes    Int      @default(30) // duración de la sesión
+  maxFailedAttempts Int      @default(5) // intentos fallidos antes de bloquear la cuenta
+  lockMinutes       Int      @default(15) // duración del bloqueo
+  listStaleHours    Int      @default(48) // horas para considerar desactualizadas las listas
+  incidentSlaDays   Int      @default(5) // días para cerrar una incidencia antes de marcarla vencida
+  updatedAt         DateTime @updatedAt
+  updatedById       Int?
+  updatedBy         User?    @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+}
+
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  username  String? // se guarda aunque el usuario no exista (intentos fallidos)
+  action    String // ver AuditAction en src/services/audit.ts
+  detail    String?
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([action])
+}
+
+// ─── Listas restrictivas ──────────────────────────────────────────────────────
+
+model SanctionList {
+  key         String           @id // debarment | peps | sanctions | crime
+  name        String
+  active      Boolean          @default(true)
+  recordCount Int              @default(0)
+  lastSyncAt  DateTime?
+  lastChange  String? // last_change de index.json por dataset, concatenado
+  syncStatus  String           @default("idle") // idle | running | error
+  syncError   String?
+  batchId     String? // lote vigente; los registros de otros lotes se descartan
+  records     SanctionRecord[]
+}
+
+model SanctionRecord {
+  id          Int          @id @default(autoincrement())
+  entityId    String // id de OpenSanctions
+  listKey     String
+  list        SanctionList @relation(fields: [listKey], references: [key], onDelete: Cascade)
+  batchId     String
+  dataset     String
+  schema      String // Person | Company | Organization...
+  name        String
+  nameNorm    String // nombre normalizado
+  sortKey     String       @default("") // grupo (A-Z, otros alfabetos, números, símbolos) + nameNorm
+  searchNorm  String       @default("") // nombre + alias normalizados (búsqueda, índice trigram)
+  aliases     String[]
+  birthDate   String?
+  countries   String[]
+  identifiers String[]
+  sanctions   String?
+  firstSeen   String?
+  lastSeen    String?
+  syncedAt    DateTime     @default(now())
+
+  @@unique([listKey, batchId, entityId])
+  @@index([listKey, batchId, sortKey])
+}
+
+// ─── Matriz de priorización de eventos LA/FT ──────────────────────────────────
+
+enum VersionStatus {
+  PROPUESTA
+  APROBADA
+  RECHAZADA
+}
+
+// Control de cambios de las ponderaciones: cada versión guarda quién, cuándo, por qué y quién aprobó.
+model WeightVersion {
+  id           Int            @id @default(autoincrement())
+  version      String         @unique // v1.0, v1.1...
+  weights      Json // { monto: 20, frecuencia: 15, ... } — suma 100
+  reason       String
+  status       VersionStatus  @default(PROPUESTA)
+  createdById  Int
+  createdBy    User           @relation("VersionAuthor", fields: [createdById], references: [id])
+  createdAt    DateTime       @default(now())
+  reviewedById Int?
+  reviewedBy   User?          @relation("VersionReviewer", fields: [reviewedById], references: [id])
+  reviewedAt   DateTime?
+  reviewNote   String?
+  incidents    DataIncident[]
+}
+
+// Evento sintético: los datos son ficticios (prototipo académico).
+model RiskEvent {
+  id          Int              @id @default(autoincrement())
+  code        String           @unique // EV-001
+  description String
+  clientName  String
+  product     String
+  channel     String
+  country     String
+  amount      Decimal?         @db.Decimal(14, 2)
+  currency    String           @default("USD")
+  scores      Json // { monto: 0-5 | null, ... } — null = dato faltante
+  createdById Int
+  createdBy   User             @relation(fields: [createdById], references: [id])
+  createdAt   DateTime         @default(now())
+  adjustments RiskAdjustment[]
+  incidents   DataIncident[]
+}
+
+model RiskAdjustment {
+  id          Int       @id @default(autoincrement())
+  eventId     Int
+  event       RiskEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  type        String // CONTROL (resta) | AGRAVANTE (suma)
+  description String
+  points      Int // siempre positivo; el tipo define el signo
+}
+
+// ─── Seguimiento: gestión de datos incorrectos (RACI) ─────────────────────────
+
+// Flujo: detección y registro → diagnóstico → corrección → revalidación → cierre.
+enum IncidentStatus {
+  REGISTRADA // detectada y documentada; falta clasificar la causa
+  DIAGNOSTICADA // causa clasificada; falta corregir
+  CORREGIDA // corregida; falta recalcular y verificar el score
+  REVALIDADA // score reproducido factor por factor; falta la aprobación del Auditor/QA
+  CERRADA // evidencia archivada y aprobada
+}
+
+enum IncidentCause {
+  CAPTURA // dato sintético o escenario mal capturado → corrige el analista de riesgo
+  REGLA // ponderación o regla → ajusta el analista de datos, aprueba el Auditor/QA
+  CALCULO // fórmula o visualización → corrige el desarrollador BI
+}
+
+model DataIncident {
+  id                  Int                @id @default(autoincrement())
+  code                String             @unique // INC-001
+  eventId             Int
+  event               RiskEvent          @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  factor              String? // factor afectado (monto, frecuencia...) o null si afecta al evento en general
+  description         String // qué falló
+  status              IncidentStatus     @default(REGISTRADA)
+  detectedById        Int
+  detectedBy          User               @relation("IncidentDetector", fields: [detectedById], references: [id])
+  detectedAt          DateTime           @default(now())
+  // Foto del ranking cuando se detectó el dato incorrecto (para medir el impacto en el orden).
+  residualBefore      Float
+  rankBefore          Int
+  rankingBefore       Json // códigos de eventos en orden de atención
+  cause               IncidentCause?
+  diagnosis           String?
+  diagnosedById       Int?
+  diagnosedBy         User?              @relation("IncidentDiagnoser", fields: [diagnosedById], references: [id])
+  correction          String?
+  correctedById       Int?
+  correctedBy         User?              @relation("IncidentCorrector", fields: [correctedById], references: [id])
+  scoreChange         Json? // { factor, from, to } cuando se corrige un puntaje capturado
+  versionId           Int? // versión de parámetros resultante (la propuesta, si la causa es una regla)
+  version             WeightVersion?     @relation(fields: [versionId], references: [id])
+  residualAfter       Float?
+  rankAfter           Int?
+  orderImpact         Boolean? // ¿el dato incorrecto alteró el orden de atención?
+  revalidation        String?
+  revalidatedById     Int?
+  revalidatedBy       User?              @relation("IncidentRevalidator", fields: [revalidatedById], references: [id])
+  sponsorNote         String? // aviso al patrocinador cuando hubo impacto
+  sponsorInformedById Int?
+  sponsorInformedBy   User?              @relation("IncidentSponsorInformer", fields: [sponsorInformedById], references: [id])
+  sponsorInformedAt   DateTime?
+  approvalNote        String?
+  approvedById        Int?
+  approvedBy          User?              @relation("IncidentApprover", fields: [approvedById], references: [id])
+  closedAt            DateTime?
+  activities          IncidentActivity[]
+
+  @@index([status])
+}
+
+// Expediente de la incidencia: cada paso queda con quién, cuándo y qué. No se edita ni se borra.
+model IncidentActivity {
+  id         Int          @id @default(autoincrement())
+  incidentId Int
+  incident   DataIncident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  userId     Int?
+  user       User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  step       String // REGISTRO | DIAGNOSTICO | CORRECCION | REVALIDACION | DEVUELTA | PATROCINADOR | CIERRE
+  note       String?
+  createdAt  DateTime     @default(now())
+
+  @@index([incidentId])
+}

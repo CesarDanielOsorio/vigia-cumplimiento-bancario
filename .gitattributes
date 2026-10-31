@@ -1,0 +1,7 @@
+# Normaliza finales de línea; los scripts de Windows se descargan siempre con CRLF (también en el ZIP de GitHub).
+* text=auto
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+*.ico binary
+*.png binary

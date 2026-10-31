@@ -1,0 +1,109 @@
+# Vigía · Cumplimiento Bancario — integración continua en Azure Pipelines.
+# Compila, valida tipos, ejecuta las pruebas automatizadas y revisa dependencias.
+# No despliega: el prototipo es académico y se ejecuta en local con datos sintéticos.
+
+name: vigia-ci-$(Date:yyyyMMdd).$(Rev:r)
+
+trigger:
+  branches:
+    include: [main, develop]
+
+pr:
+  branches:
+    include: [main, develop]
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  NODE_VERSION: '22.x'
+  # Prisma solo necesita una URL con formato válido para generar el cliente; no se conecta a ninguna base.
+  DATABASE_URL: 'postgresql://ci:ci@localhost:5432/ci?schema=public'
+
+stages:
+  - stage: Build
+    displayName: Build
+    jobs:
+      - job: Compile
+        displayName: Compilar backend y frontend
+        steps:
+          - checkout: self
+            clean: true
+          - script: git rev-parse --short HEAD
+            displayName: Identificar commit
+          - task: NodeTool@0
+            inputs:
+              versionSpec: $(NODE_VERSION)
+            displayName: Usar Node.js $(NODE_VERSION)
+          - script: npm ci
+            workingDirectory: backend
+            displayName: Instalar dependencias del backend
+          - script: npx prisma validate && npx prisma generate
+            workingDirectory: backend
+            displayName: Validar esquema y generar cliente Prisma
+          - script: npm run typecheck
+            workingDirectory: backend
+            displayName: Validar tipos del backend
+          - script: npm ci
+            workingDirectory: frontend
+            displayName: Instalar dependencias del frontend
+          - script: npm run build
+            workingDirectory: frontend
+            displayName: Compilar frontend (tsc + vite)
+          - task: PublishPipelineArtifact@1
+            inputs:
+              targetPath: frontend/dist
+              artifact: frontend-dist
+            displayName: Publicar frontend compilado
+
+  - stage: Test
+    displayName: Test
+    dependsOn: Build
+    jobs:
+      - job: UnitTests
+        displayName: Pruebas automatizadas
+        steps:
+          - task: NodeTool@0
+            inputs:
+              versionSpec: $(NODE_VERSION)
+            displayName: Usar Node.js $(NODE_VERSION)
+          - script: npm ci && npx prisma generate
+            workingDirectory: backend
+            displayName: Preparar backend
+          - script: >
+              node --import tsx --test
+              --test-reporter=spec --test-reporter-destination=stdout
+              --test-reporter=junit --test-reporter-destination=$(Agent.TempDirectory)/junit.xml
+              "src/**/*.test.ts"
+            workingDirectory: backend
+            displayName: Fórmula, sensibilidad, permisos y normalización
+          - task: PublishTestResults@2
+            condition: always()
+            inputs:
+              testResultsFormat: JUnit
+              testResultsFiles: $(Agent.TempDirectory)/junit.xml
+              testRunTitle: Vigía - pruebas unitarias
+              failTaskOnFailedTests: true
+            displayName: Publicar resultados
+
+  - stage: Security
+    displayName: Security
+    dependsOn: Build
+    jobs:
+      - job: Dependencies
+        displayName: Vulnerabilidades de dependencias
+        steps:
+          - task: NodeTool@0
+            inputs:
+              versionSpec: $(NODE_VERSION)
+            displayName: Usar Node.js $(NODE_VERSION)
+          # Reporta sin bloquear: deepmerge-ts (herramienta de Prisma 6) es un riesgo aceptado y documentado
+          # en la matriz de riesgos hasta migrar a Prisma 7. Cualquier hallazgo nuevo queda visible aquí.
+          - script: npm audit --omit=dev --audit-level=high
+            workingDirectory: backend
+            continueOnError: true
+            displayName: npm audit backend
+          - script: npm audit --omit=dev --audit-level=high
+            workingDirectory: frontend
+            continueOnError: true
+            displayName: npm audit frontend

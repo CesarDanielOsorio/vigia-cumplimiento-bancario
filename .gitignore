@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.env
+*.log
+
+# Documentos de trabajo: se quedan solo en esta PC
+_material-privado/

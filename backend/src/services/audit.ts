@@ -28,7 +28,8 @@ export type AuditAction =
   | 'USER_UPDATE'
   | 'USER_UNLOCK'
   | 'USER_RESET_PASSWORD'
-  | 'SETTINGS_UPDATE';
+  | 'SETTINGS_UPDATE'
+  | 'DEMO_RESET';
 
 // La bitácora nunca debe tumbar la petición: si falla, se reporta en consola.
 export async function audit(

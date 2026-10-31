@@ -8,7 +8,7 @@ Aplicación web local con cuatro módulos:
 1. **Listas Restrictivas Internacionales**: consulta de sanciones (OFAC, ONU, UE, UK), PEPs, empresas inhabilitadas por el Banco Mundial y personas buscadas. Los datos vienen de [OpenSanctions](https://www.opensanctions.org) (licencia CC BY-NC 4.0, uso académico).
 2. **Matriz LA/FT** (Proyecto 2): matriz parametrizable que prioriza eventos sintéticos de riesgo de lavado de activos con 7 factores ponderados, riesgo inherente y residual, regla de dato faltante, control de cambios versionado con aprobación y prueba de sensibilidad.
 3. **Seguimiento de incidencias**: gestión de datos incorrectos según la matriz RACI del equipo. Flujo detección → registro → diagnóstico → corrección → revalidación → cierre, con registro de incidencias, expediente inmutable, medición del impacto en el orden de atención y aviso al patrocinador.
-4. **Administración**: bitácora de auditoría (administrador y Auditor/QA) y panel de configuración (usuarios, roles, permisos y parámetros de seguridad).
+4. **Administración**: bitácora de auditoría (administrador y Auditor/QA) y panel de configuración (usuarios, roles, permisos y parámetros de seguridad). En **Configuración → Demostración** el administrador puede restablecer los datos de ejemplo (INC-001 cerrada, INC-002 registrada) para volver a ensayar la presentación; la bitácora se conserva.
 
 ## Stack
 

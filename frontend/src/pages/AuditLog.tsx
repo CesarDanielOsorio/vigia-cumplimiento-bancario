@@ -19,6 +19,7 @@ const ACTION_LABEL: Record<string, string> = {
   INCIDENT_CLOSE: 'Incidencia cerrada', INCIDENT_SOD_DENIED: 'Segregación de funciones: bloqueado',
   USER_CREATE: 'Usuario creado', USER_UPDATE: 'Usuario modificado', USER_UNLOCK: 'Usuario desbloqueado',
   USER_RESET_PASSWORD: 'Contraseña restablecida', SETTINGS_UPDATE: 'Parámetros modificados',
+  DEMO_RESET: 'Demostración restablecida',
 }
 
 // Acciones que un auditor revisa con lupa: accesos fallidos y controles que se activaron.

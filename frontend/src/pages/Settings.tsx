@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
-  AlertCircle, ArrowRight, Copy, KeyRound, Loader2, LockOpen, Plus, Save, ShieldCheck, SlidersHorizontal, UserCog, Users, X,
+  AlertCircle, ArrowRight, Copy, KeyRound, Loader2, LockOpen, Plus, RotateCcw, Save, ShieldCheck, SlidersHorizontal, UserCog, Users, X,
 } from 'lucide-react'
 import { api, type AdminUser, type Role, type Settings as SettingsT, type SettingsResponse } from '../lib/api'
 import { useAuth } from '../lib/auth'
@@ -16,6 +16,7 @@ const TABS = [
   { key: 'usuarios', label: 'Usuarios y roles', icon: Users },
   { key: 'permisos', label: 'Permisos por rol', icon: ShieldCheck },
   { key: 'parametros', label: 'Parámetros', icon: SlidersHorizontal },
+  { key: 'demostracion', label: 'Demostración', icon: RotateCcw },
 ] as const
 type Tab = (typeof TABS)[number]['key']
 
@@ -29,6 +30,16 @@ const FIELDS: { key: keyof SettingsT; label: string; unit: string; min: number; 
   { key: 'lockMinutes', label: 'Duración del bloqueo', unit: 'min', min: 5, max: 120, group: 'seguridad', help: 'Tiempo que la cuenta queda bloqueada. El administrador puede desbloquearla antes.' },
   { key: 'listStaleHours', label: 'Listas desactualizadas después de', unit: 'horas', min: 12, max: 168, group: 'operacion', help: 'Si las listas restrictivas no se sincronizan en este tiempo, se muestra una alerta.' },
   { key: 'incidentSlaDays', label: 'Plazo para cerrar una incidencia', unit: 'días', min: 1, max: 30, group: 'operacion', help: 'Las incidencias abiertas más tiempo se marcan como vencidas en el seguimiento.' },
+]
+
+// Guion de la demostración de INC-002: qué paso hace cada rol del RACI y con qué usuario se ejecuta.
+const DEMO_STEPS: { step: string; who: string; user: string; note?: string }[] = [
+  { step: 'Registro', who: 'Analista de riesgo', user: 'ya viene hecho', note: 'INC-002 llega registrada por «analista».' },
+  { step: 'Diagnóstico', who: 'Analista de datos', user: 'admin', note: 'Causa: error de captura.' },
+  { step: 'Corrección', who: 'Analista de riesgo', user: 'analista', note: 'Jurisdicción 1 → 4. Si la hace el admin, ya no puede revalidar.' },
+  { step: 'Revalidación', who: 'Analista de datos', user: 'admin', note: 'EV-005 pasa de 50 a 62 y del 3.º al 2.º lugar: impacto Sí.' },
+  { step: 'Aviso al patrocinador', who: 'Líder de proyecto', user: 'admin' },
+  { step: 'Cierre', who: 'Auditor/QA', user: 'auditor', note: 'Nadie más puede cerrar, ni el administrador.' },
 ]
 
 export default function Settings() {
@@ -319,6 +330,79 @@ export default function Settings() {
                 </dl>
                 <Link to="/matriz?tab=ponderaciones" className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-mint-700 hover:underline">
                   Ir a Ponderaciones y cambios <ArrowRight className="size-3" />
+                </Link>
+              </section>
+            </div>
+          )}
+
+          {tab === 'demostracion' && (
+            <div className="grid gap-5 lg:grid-cols-[1fr_1.3fr]">
+              <section className="rounded-2xl border border-slate-200/80 bg-white p-5">
+                <h2 className="font-semibold text-navy-900">Restablecer demostración</h2>
+                <p className="mt-1 text-xs text-slate-500">
+                  Deja la matriz y el seguimiento como recién instalados para volver a ensayar la presentación.
+                </p>
+                <div className="mt-4 grid gap-3 text-xs sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+                  <div className="rounded-lg bg-amber-50 p-3 ring-1 ring-amber-200">
+                    <p className="font-semibold text-amber-900">Se restablece</p>
+                    <ul className="mt-1 list-disc space-y-0.5 pl-4 text-amber-900/90">
+                      <li>Incidencias: vuelven INC-001 (cerrada) e INC-002 (registrada)</li>
+                      <li>Eventos EV-001 a EV-005 con sus puntajes originales</li>
+                      <li>Se borran eventos y versiones de pesos creados en los ensayos</li>
+                      <li>Se desbloquean las cuentas bloqueadas</li>
+                    </ul>
+                  </div>
+                  <div className="rounded-lg bg-mint-50 p-3 ring-1 ring-mint-200">
+                    <p className="font-semibold text-mint-900">Se conserva</p>
+                    <ul className="mt-1 list-disc space-y-0.5 pl-4 text-mint-900/90">
+                      <li>Usuarios y contraseñas</li>
+                      <li>Listas restrictivas descargadas</li>
+                      <li>Parámetros del sistema</li>
+                      <li>La bitácora: el restablecimiento queda registrado</li>
+                    </ul>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    if (!window.confirm('¿Restablecer la demostración?\n\nSe borran las incidencias, eventos y versiones de pesos creados en los ensayos, y vuelven INC-001 e INC-002 como al instalar. Usuarios, listas, parámetros y bitácora no se tocan.')) return
+                    act(async () => {
+                      const r = await api.resetDemo()
+                      const extra = [r.events && `${r.events} evento(s)`, r.versions && `${r.versions} versión(es) de pesos`].filter(Boolean)
+                      setNotice(`Demostración restablecida: INC-002 está otra vez en «Registrada»${extra.length ? ` y se borraron ${extra.join(' y ')} de ensayo` : ''}.`)
+                    })
+                  }}
+                  disabled={busy}
+                  className="mt-4 inline-flex items-center gap-2 rounded-lg bg-navy-900 px-4 py-2 text-sm font-semibold text-white hover:bg-navy-800 disabled:opacity-50"
+                >
+                  {busy ? <Loader2 className="size-4 animate-spin text-mint-400" /> : <RotateCcw className="size-4 text-mint-400" />} Restablecer demostración
+                </button>
+              </section>
+
+              <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white">
+                <div className="px-4 py-3">
+                  <h2 className="font-semibold text-navy-900">Guion sugerido · INC-002</h2>
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    El administrador puede hacer casi todo, pero el sistema no lo deja revalidar su propia corrección ni cerrar: eso es la segregación de funciones.
+                  </p>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[520px] text-xs">
+                    <thead className="bg-navy-900 text-[10px] uppercase tracking-wider text-slate-200">
+                      <tr>{['Paso', 'Rol que lo hace (RACI)', 'Usuario en la demo'].map(h => <th key={h} className="px-3 py-2 text-left font-semibold">{h}</th>)}</tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {DEMO_STEPS.map(d => (
+                        <tr key={d.step}>
+                          <td className="px-3 py-2 font-semibold text-navy-900">{d.step}</td>
+                          <td className="px-3 py-2 text-slate-600">{d.who}{d.note && <p className="text-[11px] text-slate-400">{d.note}</p>}</td>
+                          <td className="px-3 py-2"><code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] text-navy-900">{d.user}</code></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <Link to="/seguimiento/INC-002" className="flex items-center gap-1 border-t border-slate-100 px-4 py-3 text-xs font-medium text-mint-700 hover:underline">
+                  Abrir INC-002 <ArrowRight className="size-3" />
                 </Link>
               </section>
             </div>

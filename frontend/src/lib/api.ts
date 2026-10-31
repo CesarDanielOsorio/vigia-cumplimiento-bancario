@@ -244,6 +244,7 @@ export const api = {
   resetPassword: (id: number) => post<{ user: AdminUser; password: string }>(`/admin/users/${id}/reset-password`),
   settings: () => request<SettingsResponse>('/admin/settings'),
   saveSettings: (s: Settings) => send<{ settings: Settings }>('PUT', '/admin/settings', s),
+  resetDemo: () => post<{ incidents: number; versions: number; events: number; unlocked: number }>('/admin/demo/reset'),
   audit: (q: string, action: string, page: number) =>
     request<AuditResponse>(`/admin/audit?${new URLSearchParams({ q, action, page: String(page) })}`),
 };

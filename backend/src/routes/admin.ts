@@ -8,6 +8,7 @@ import { requirePermission } from '../middleware/auth';
 import { PERMISSIONS, ROLE_LABEL } from '../config/permissions';
 import { LEVELS, MISSING_SCORE } from '../config/riskMatrix';
 import { audit } from '../services/audit';
+import { resetDemo } from '../services/demoData';
 import { currentVersion } from '../services/matrixData';
 import { getSettings, settingsMeta, settingsSchema, updateSettings } from '../services/settings';
 
@@ -153,6 +154,19 @@ adminRouter.put('/settings', requirePermission('system.manage'), async (req, res
     .map(k => `${SETTING_LABEL[k]} ${before[k]} → ${settings[k]}`);
   if (changes.length) await audit(req, 'SETTINGS_UPDATE', { detail: changes.join('; ') });
   res.json({ settings });
+});
+
+// ─── Demostración ─────────────────────────────────────────────────────────────
+
+// Vuelve la matriz y el seguimiento al estado de ejemplo (INC-001 cerrada, INC-002 registrada) para ensayar
+// la presentación. Es una sola transacción: si algo falla, no cambia nada. La bitácora se conserva.
+adminRouter.post('/demo/reset', requirePermission('system.manage'), async (req, res) => {
+  const r = await prisma.$transaction(tx => resetDemo(tx), { timeout: 30000 });
+  await audit(req, 'DEMO_RESET', {
+    detail: `Demostración restablecida: ${r.incidents} incidencias reemplazadas por INC-001 e INC-002, `
+      + `${r.versions} versiones de ensayo y ${r.events} eventos de ensayo eliminados, ${r.unlocked} cuentas desbloqueadas`,
+  });
+  res.json(r);
 });
 
 // ─── Bitácora de auditoría (administrador y Auditor/QA, solo lectura) ─────────
